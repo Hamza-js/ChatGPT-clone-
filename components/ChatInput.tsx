@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import { FormEvent, useState } from "react";
 import { db } from "../firebases";
 import { toast } from "react-hot-toast";
+import ModelSelection from "./ModelSelection";
+import useSWR from "swr";
 
 type Props = {
   chatId: string;
@@ -15,8 +17,9 @@ function ChatInput({ chatId }: Props) {
   const [prompt, setPrompt] = useState("");
   const { data: session } = useSession();
 
-  // use SWR to get model
-  const model = "text-davinci-003";
+  const { data: model } = useSWR("model", {
+    fallbackData: "text-davinci-003",
+  });
 
   const sendMessage = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -25,6 +28,16 @@ function ChatInput({ chatId }: Props) {
     const input = prompt.trim();
     setPrompt("");
 
+console.log(session)
+    const userImage = session?.user?.image
+      ? encodeURIComponent(session?.user?.image)
+          .replace(/\./g, "_")
+          .replace(/#/g, "_")
+          .replace(/\$/g, "_")
+          .replace(/\[/g, "_")
+          .replace(/\]/g, "_")
+          .replace(/\//g, "_")
+      : "";
     const message: Message = {
       text: input,
       createdAt: serverTimestamp(),
@@ -32,7 +45,7 @@ function ChatInput({ chatId }: Props) {
         _id: session?.user?.email!,
         name: session?.user?.name!,
         avatar:
-          session?.user?.image! ||
+          userImage ||
           `https://ui-avatars.com/api/?name=${session?.user?.name}`,
       },
     };
@@ -40,7 +53,7 @@ function ChatInput({ chatId }: Props) {
       collection(
         db,
         "users",
-        session?.user?.image!,
+        session?.user?.email!,
         "chats",
         chatId,
         "messages"
@@ -61,9 +74,10 @@ function ChatInput({ chatId }: Props) {
         model,
         session,
       }),
-    }).then(() => {
+    }).then((res) => {
+      console.log(res);
       // nofication to say successfull
-      toast.loading("ChatGPT has responded!", {
+      toast.success("ChatGPT has responded!", {
         id: notification,
       });
     });
@@ -92,7 +106,9 @@ function ChatInput({ chatId }: Props) {
       </form>
 
       {/* Model selection */}
-      <div></div>
+      <div className="sm:hidden">
+        <ModelSelection />
+      </div>
     </div>
   );
 }
